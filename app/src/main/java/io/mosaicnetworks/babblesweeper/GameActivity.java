@@ -5,7 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.ImageView;
 import android.widget.TableLayout;
 import android.widget.TableRow;
@@ -22,13 +22,37 @@ public class GameActivity extends AppCompatActivity {
 
     int PLAYERS = 4;
 
-    boolean firstSquare = true;
 
-    int cellsArray[];
-    CellState cellsState[];
-    int cellsNeighbours[];
+    public enum TheCellState {
+        BOMB,
+        EMPTY,
+        THEIRS,
+        PENDING,
+        MINE,
+    }
+
+    class Cell {
+        TheCellState CellState = TheCellState.EMPTY;
+        int Owner = -1;
+        int Neighbours = 0;
+        int ID = -1;
+
+        public Cell (int id) {
+            this.ID = id;
+        }
+    }
 
 
+    class Player {
+        String PublicKey;
+        int squares = 1;
+    }
+
+
+    Cell TheCells[];
+    Player ThePlayers[];
+
+    int MyPlayerIdx = 0;
 
     GameState gameState;
 
@@ -38,15 +62,6 @@ public class GameActivity extends AppCompatActivity {
         GAMEOVER
     }
 
-
-    public enum CellState {
-        AVAILABLE,
-        PENDING,
-        MINE,
-        THEIRS,
-        NEIGHBOURING,
-        BOMB,
-    }
 
 
 
@@ -65,7 +80,6 @@ public class GameActivity extends AppCompatActivity {
     private void InitialiseBoard() {
         Log.i(MainActivity.TAG, "InitialiseBoard");
 
-        firstSquare = true;
         int width_weight = 100/COLUMNS;
         int height_weight = 80/ROWS;
 
@@ -81,13 +95,7 @@ public class GameActivity extends AppCompatActivity {
                     return ;
                 }
 
-                switch (cellsState[cellNo]) {
-                    case AVAILABLE:
-                        if ( ! firstSquare) {
-                            return ;
-                        }
-                        firstSquare = false;
-                        break;
+                switch (TheCells[cellNo].CellState) {
                     case THEIRS:
                         gameState = GameState.IAMDEAD;
                         SetStatusMessage("Someone else is here. You lose");
@@ -96,28 +104,45 @@ public class GameActivity extends AppCompatActivity {
                         gameState = GameState.IAMDEAD;
                         SetStatusMessage("BOMB! You lose");
                         return;
-
                     case MINE:
-
                         return;
                     case PENDING:
                         // Do nothing
                         return;
-
                 }
 
-                cellsState[cellNo] = CellState.PENDING;
-                ImageButton ib = (ImageButton) v;
-                ChangeCellState((ImageButton) v, cellNo, 0); // For pending neighbours is irrelevant
+                // We clicked on an empty square.
+
+                int neighbours[] = NeighbouringCells(cellNo);
+                boolean isNeighbour = false;
+
+                for (int i = 0; i< neighbours.length; i++) {
+                    if (neighbours[i] > -1 ) {
+                        if ( (TheCells[neighbours[i]].CellState == TheCellState.MINE) ||
+                                (TheCells[neighbours[i]].CellState == TheCellState.PENDING) ) {
+                            isNeighbour = true;
+                        }
+                    }
+                }
+
+                if ( ! isNeighbour) { return; }
+
+                TheCells[cellNo].CellState = TheCellState.PENDING;
                 UpdateNeighbours(cellNo);
 
             }
         };
 
 
-        cellsNeighbours = new int[numCells];
-        cellsArray = new int[numCells];
-        cellsState = new CellState[numCells];
+
+        TheCells = new Cell[numCells];
+        ThePlayers = new Player[PLAYERS];
+
+        for (int j = 0; j < ThePlayers.length; j++) {
+            ThePlayers[j] = new Player();
+        }
+
+
 
 
         TableLayout tl= (TableLayout) findViewById(R.id.tableLayout);
@@ -134,22 +159,20 @@ public class GameActivity extends AppCompatActivity {
                 tl.addView(tr);
             }
 
-            ImageButton ib = new ImageButton(this);
+            ImageView ib = new ImageView(this);
 
 
             ib.setId(View.generateViewId());
 
 
               ib.setTag(i);
-              cellsArray[i] = ib.getId();
-              cellsState[i] = CellState.AVAILABLE;
-              cellsNeighbours[i] = 0;
+              TheCells[i] = new Cell(ib.getId());
 
               tr.addView(ib);
 
               ib.setLayoutParams(new TableRow.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, width_weight));
               ib.setScaleType(ImageView.ScaleType.FIT_XY);
-
+     //         ib.att(style="?android:attr/borderlessButtonStyle");
               int id = getResources().getIdentifier("blank", "drawable", this.getPackageName());
 
               ib.setImageResource(id);
@@ -164,26 +187,39 @@ public class GameActivity extends AppCompatActivity {
 
         do {
            int possibleCell = new Random().nextInt(numCells);
-           if ( cellsState[possibleCell] == CellState.AVAILABLE ) {
-               cellsState[possibleCell] = CellState.BOMB;
+           if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
+               TheCells[possibleCell].CellState = TheCellState.BOMB;
                bombCnt++;
            }
         }  while (bombCnt < numberOfBombs) ;
 
 
+// This will need to be deterministic for the multinode approach
 
+        int PlayerCell = -1;
+        int PlayerCnt = 0;
+        do {
+            int possibleCell = new Random().nextInt(numCells);
+            if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
+                if (MyPlayerIdx == PlayerCnt) {
+                    TheCells[possibleCell].CellState = TheCellState.MINE;
+                    PlayerCell = possibleCell;
+                } else {
+                    TheCells[possibleCell].CellState = TheCellState.THEIRS;
+                }
+                TheCells[possibleCell].Owner = PlayerCnt;
+                PlayerCnt++;            }
+        } while (PlayerCnt < PLAYERS );
+
+
+        // Defer so all the other players are in situ
+        UpdateNeighbours(PlayerCell);
 
         gameState = GameState.PLAYING;
         SetStatusMessage("Game On...");
 
     }
 
-
-
-    private void ChangeButtonState(ImageButton ib, int id, int newState) {
-
-
-    }
 
 
     private void SetStatusMessage(String msg) {
@@ -273,49 +309,44 @@ public class GameActivity extends AppCompatActivity {
         // ROWS, COLUMNS
         int neighbours[] = NeighbouringCells(cellNo);
 
-        for (int i = 0; i< neighbours.length; i++) {
-            if (neighbours[i] >= 0) {
-                if ((cellsState[neighbours[i]] == CellState.MINE)||
-                        (cellsState[neighbours[i]] == CellState.PENDING) ) {
-                    continue;
-                }
                 int neighbourCount = 0;
-                int neighbourNeighbours[] = NeighbouringCells(neighbours[i]);
+                int neighbourNeighbours[] = NeighbouringCells(cellNo);
                 for (int j = 0; j< neighbourNeighbours.length; j++) {
                     if (neighbourNeighbours[j] >= 0) {
-                        if (
-                                (cellsState[neighbourNeighbours[j]] == CellState.BOMB) ||
-                                (cellsState[neighbourNeighbours[j]] == CellState.THEIRS)) {   //TODO change this to
+                        Cell thisCell = TheCells[neighbourNeighbours[j]];
+
+                        if ( (thisCell.CellState == TheCellState.BOMB) ||
+                                (thisCell.CellState == TheCellState.THEIRS)) {
                             neighbourCount++;
                         }
+
                     }
                 }
-                if  (cellsState[neighbours[i]] == CellState.AVAILABLE) {
-                    cellsState[neighbours[i]] = CellState.NEIGHBOURING;
-                }
-                ChangeCellState((ImageButton)findViewById(cellsArray[neighbours[i]]), neighbours[i], neighbourCount);
-            }
-        }
+                TheCells[cellNo].Neighbours = neighbourCount;
+                ChangeCellState(cellNo);
     }
 
 
 
-
-    private void ChangeCellState(ImageButton ib, int CellNo, int neighbours) {
+    private void ChangeCellState(int CellNo) {
 
         String imageName = "";
 
-        switch(cellsState[CellNo]) {
-            case MINE:
-                imageName = "claimed";
-                break;
-            case PENDING:
-                imageName = "pending";
-                break;
-            case AVAILABLE:
+        ImageView ib = (ImageView) findViewById(TheCells[CellNo].ID);
+
+        switch(TheCells[CellNo].CellState) {
+      //      case PENDING:
+        //        imageName = "pending";
+          //      break;
+            case EMPTY:
                 imageName = "blank";
                 break;
+            case BOMB:
+                imageName = "blank";
+            case THEIRS:
+                imageName = "blank";
             default:
+                int neighbours = TheCells[CellNo].Neighbours;
                 imageName = "cell" + Integer.toString(neighbours);
         }
 
