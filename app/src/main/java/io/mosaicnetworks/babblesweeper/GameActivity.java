@@ -154,6 +154,8 @@ public class GameActivity extends AppCompatActivity {
 
             if (i%COLUMNS == 0) {
                 tr = new TableRow(this);
+
+
                 tr.setLayoutParams(new TableLayout.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, height_weight));
                 tr.setWeightSum(100);
                 tl.addView(tr);

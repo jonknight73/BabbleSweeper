@@ -9,11 +9,12 @@
     tools:context=".GameActivity">
 
     <TableLayout
+        android:id="@+id/tableLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="90"
-        android:id="@+id/tableLayout">
 
+        android:layout_gravity="center|center_horizontal|fill_horizontal|fill_vertical"
+        android:layout_weight="90">
 
 
     </TableLayout>

@@ -7,9 +7,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
+import io.mosaicnetworks.babble.node.KeyPair;
+
+
 public class MainActivity extends AppCompatActivity {
 
-    public static final String TAG = "JK-NOV21";
+    public static final String TAG = "BabbleSweeper-NOV25";
 
 
     @Override
@@ -26,10 +29,13 @@ public class MainActivity extends AppCompatActivity {
    //     EditText editText = (EditText) findViewById(R.id.editText);
    //     intent.putExtra(EXTRA_MESSAGE, message);
         startActivity(intent);
+    }
 
 
+    public void btTestClick(View view) {
 
-
+        KeyPair kp = new KeyPair();
+        Log.i("Yippee",kp.privateKey);
     }
 
 
