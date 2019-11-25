@@ -10,18 +10,24 @@ import android.widget.ImageView;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
+import java.util.Random;
 
 public class GameActivity extends AppCompatActivity {
 
-    int COLUMNS = 4;
-    int ROWS = 8;
+    int COLUMNS = 8;
+    int ROWS = 12;
     int numCells = COLUMNS * ROWS;
 
+    int numberOfBombs = 10;
+
     int PLAYERS = 4;
+
+    boolean firstSquare = true;
 
     int cellsArray[];
     CellState cellsState[];
     int cellsNeighbours[];
+
 
 
     GameState gameState;
@@ -37,7 +43,9 @@ public class GameActivity extends AppCompatActivity {
         AVAILABLE,
         PENDING,
         MINE,
-        THEIRS
+        THEIRS,
+        NEIGHBOURING,
+        BOMB,
     }
 
 
@@ -57,7 +65,7 @@ public class GameActivity extends AppCompatActivity {
     private void InitialiseBoard() {
         Log.i(MainActivity.TAG, "InitialiseBoard");
 
-
+        firstSquare = true;
         int width_weight = 100/COLUMNS;
         int height_weight = 80/ROWS;
 
@@ -75,16 +83,20 @@ public class GameActivity extends AppCompatActivity {
 
                 switch (cellsState[cellNo]) {
                     case AVAILABLE:
-                        cellsState[cellNo] = CellState.PENDING;
-                        ImageButton ib = (ImageButton) v;
-                        ChangeCellState((ImageButton) v, cellNo, 0); // For pending neighbours is irrelevant
-                        UpdateNeighbours(cellNo);
-
+                        if ( ! firstSquare) {
+                            return ;
+                        }
+                        firstSquare = false;
                         break;
                     case THEIRS:
                         gameState = GameState.IAMDEAD;
-                        SetStatusMessage("You lose");
-                        break;
+                        SetStatusMessage("Someone else is here. You lose");
+                        return;
+                    case BOMB:
+                        gameState = GameState.IAMDEAD;
+                        SetStatusMessage("BOMB! You lose");
+                        return;
+
                     case MINE:
 
                         return;
@@ -94,8 +106,10 @@ public class GameActivity extends AppCompatActivity {
 
                 }
 
-
+                cellsState[cellNo] = CellState.PENDING;
                 ImageButton ib = (ImageButton) v;
+                ChangeCellState((ImageButton) v, cellNo, 0); // For pending neighbours is irrelevant
+                UpdateNeighbours(cellNo);
 
             }
         };
@@ -136,13 +150,27 @@ public class GameActivity extends AppCompatActivity {
               ib.setLayoutParams(new TableRow.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, width_weight));
               ib.setScaleType(ImageView.ScaleType.FIT_XY);
 
-              int id = getResources().getIdentifier("cell0", "drawable", this.getPackageName());
+              int id = getResources().getIdentifier("blank", "drawable", this.getPackageName());
 
               ib.setImageResource(id);
               ib.setAdjustViewBounds(true);
               ib.setOnClickListener(listener);
 
         }
+
+
+
+        int bombCnt = 0;
+
+        do {
+           int possibleCell = new Random().nextInt(numCells);
+           if ( cellsState[possibleCell] == CellState.AVAILABLE ) {
+               cellsState[possibleCell] = CellState.BOMB;
+               bombCnt++;
+           }
+        }  while (bombCnt < numberOfBombs) ;
+
+
 
 
         gameState = GameState.PLAYING;
@@ -167,7 +195,7 @@ public class GameActivity extends AppCompatActivity {
 
 
     private int[] NeighbouringCells(int cellNo) {
-        int neighbours[] = new int[8];
+        int neighbours[] = new int[9];
 
 // Top 3
         if (cellNo >= COLUMNS) {
@@ -201,11 +229,13 @@ public class GameActivity extends AppCompatActivity {
             neighbours[3] = -1;
         }
 
+        neighbours[4] = cellNo;
+
 
         if (cellNo%COLUMNS < (COLUMNS - 1) ) { //MiddleRight
-            neighbours[4] = cellNo  + 1;
+            neighbours[5] = cellNo  + 1;
         } else {
-            neighbours[4] = -1;
+            neighbours[5] = -1;
         }
 
 
@@ -213,17 +243,17 @@ public class GameActivity extends AppCompatActivity {
 // Bottom 3
         if (cellNo < (numCells - COLUMNS)) {
             if (cellNo%COLUMNS > 0) { //BottomLeft
-                neighbours[5] = cellNo + COLUMNS - 1;
+                neighbours[6] = cellNo + COLUMNS - 1;
             } else {
-                neighbours[5] = -1;
+                neighbours[6] = -1;
             }
 
-            neighbours[6] = cellNo + COLUMNS; //BottomCentre
+            neighbours[7] = cellNo + COLUMNS; //BottomCentre
 
             if (cellNo%COLUMNS < (COLUMNS - 1) ) { //BottomRight
-                neighbours[7] = cellNo + COLUMNS + 1;
+                neighbours[8] = cellNo + COLUMNS + 1;
             } else {
-                neighbours[7] = -1;
+                neighbours[8] = -1;
             }
 
 
@@ -244,7 +274,7 @@ public class GameActivity extends AppCompatActivity {
         int neighbours[] = NeighbouringCells(cellNo);
 
         for (int i = 0; i< neighbours.length; i++) {
-            if (neighbours[i] > 0) {
+            if (neighbours[i] >= 0) {
                 if ((cellsState[neighbours[i]] == CellState.MINE)||
                         (cellsState[neighbours[i]] == CellState.PENDING) ) {
                     continue;
@@ -252,13 +282,16 @@ public class GameActivity extends AppCompatActivity {
                 int neighbourCount = 0;
                 int neighbourNeighbours[] = NeighbouringCells(neighbours[i]);
                 for (int j = 0; j< neighbourNeighbours.length; j++) {
-                    if (neighbourNeighbours[j] > 0) {
-                        if ( (cellsState[neighbourNeighbours[j]] == CellState.PENDING) ||
-                                (cellsState[neighbourNeighbours[j]] == CellState.MINE) ||
+                    if (neighbourNeighbours[j] >= 0) {
+                        if (
+                                (cellsState[neighbourNeighbours[j]] == CellState.BOMB) ||
                                 (cellsState[neighbourNeighbours[j]] == CellState.THEIRS)) {   //TODO change this to
                             neighbourCount++;
                         }
                     }
+                }
+                if  (cellsState[neighbours[i]] == CellState.AVAILABLE) {
+                    cellsState[neighbours[i]] = CellState.NEIGHBOURING;
                 }
                 ChangeCellState((ImageButton)findViewById(cellsArray[neighbours[i]]), neighbours[i], neighbourCount);
             }
@@ -278,6 +311,9 @@ public class GameActivity extends AppCompatActivity {
                 break;
             case PENDING:
                 imageName = "pending";
+                break;
+            case AVAILABLE:
+                imageName = "blank";
                 break;
             default:
                 imageName = "cell" + Integer.toString(neighbours);
