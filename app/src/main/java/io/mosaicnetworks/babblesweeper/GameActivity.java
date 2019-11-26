@@ -2,6 +2,7 @@ package io.mosaicnetworks.babblesweeper;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -10,9 +11,14 @@ import android.widget.ImageView;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import java.util.Random;
 
-public class GameActivity extends AppCompatActivity {
+import io.mosaicnetworks.babble.node.BabbleService;
+import io.mosaicnetworks.babble.node.ServiceObserver;
+
+public class GameActivity extends AppCompatActivity  implements ServiceObserver {
 
     int COLUMNS = 8;
     int ROWS = 12;
@@ -21,6 +27,13 @@ public class GameActivity extends AppCompatActivity {
     int numberOfBombs = 10;
 
     int PLAYERS = 4;
+
+    int initialSquares[] = {COLUMNS + 1, numCells - 2 - COLUMNS, (2*COLUMNS)-2, numCells - COLUMNS - COLUMNS + 1};
+
+
+
+    boolean showPlayers = false;
+
 
 
     public enum TheCellState {
@@ -46,6 +59,8 @@ public class GameActivity extends AppCompatActivity {
     class Player {
         String PublicKey;
         int squares = 1;
+        String moniker;
+        boolean isDead = false;
     }
 
 
@@ -57,12 +72,15 @@ public class GameActivity extends AppCompatActivity {
     GameState gameState;
 
     public enum GameState {
+        WAITINGTOSTART,
         PLAYING,
         IAMDEAD,
         GAMEOVER
     }
 
 
+    private String mMoniker;
+    private final MessagingService mMessagingService = MessagingService.getInstance();
 
 
     @Override
@@ -73,6 +91,30 @@ public class GameActivity extends AppCompatActivity {
         Log.i(MainActivity.TAG, "GameActivity.onCreate");
 
         InitialiseBoard();
+
+
+        Intent intent = getIntent();
+        mMoniker = intent.getStringExtra("MONIKER");
+
+  //      initialiseAdapter();
+        mMessagingService.registerObserver(this);
+
+        if (mMessagingService.getState()!= BabbleService.State.RUNNING_WITH_DISCOVERY) {
+            Toast.makeText(this, "Unable to advertise peers", Toast.LENGTH_LONG).show();
+        }
+
+
+//        randSeed = Double.parseDouble(Math.random());
+        mMessagingService.submitTx(new Message("AP:" + mMoniker + ":" +
+                Integer.toString(MyPlayerIdx), mMoniker).toBabbleTx());
+
+
+
+// Actually start the game play now we have babble up and at them.
+        gameState = GameState.WAITINGTOSTART;
+        SetStatusMessage("Waiting to Start");
+
+    //    StartGame();
     }
 
 
@@ -80,9 +122,9 @@ public class GameActivity extends AppCompatActivity {
     private void InitialiseBoard() {
         Log.i(MainActivity.TAG, "InitialiseBoard");
 
-        int width_weight = 100/COLUMNS;
-        int height_weight = 80/ROWS;
-
+        int width_weight = 100 / COLUMNS;
+        int height_weight = 80 / ROWS;
+        showPlayers = false;
 
         View.OnClickListener listener = new View.OnClickListener() {
             @Override
@@ -92,16 +134,18 @@ public class GameActivity extends AppCompatActivity {
 
 // If GameState is not in Playing State, you cannot do anything with the cells
                 if (gameState != GameState.PLAYING) {
-                    return ;
+                    return;
                 }
 
                 switch (TheCells[cellNo].CellState) {
                     case THEIRS:
-                        gameState = GameState.IAMDEAD;
+                        ChangeGameState(GameState.IAMDEAD);
+                        mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
                         SetStatusMessage("Someone else is here. You lose");
                         return;
                     case BOMB:
-                        gameState = GameState.IAMDEAD;
+                        ChangeGameState(GameState.IAMDEAD);
+                        mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
                         SetStatusMessage("BOMB! You lose");
                         return;
                     case MINE:
@@ -116,43 +160,37 @@ public class GameActivity extends AppCompatActivity {
                 int neighbours[] = NeighbouringCells(cellNo);
                 boolean isNeighbour = false;
 
-                for (int i = 0; i< neighbours.length; i++) {
-                    if (neighbours[i] > -1 ) {
-                        if ( (TheCells[neighbours[i]].CellState == TheCellState.MINE) ||
-                                (TheCells[neighbours[i]].CellState == TheCellState.PENDING) ) {
+                for (int i = 0; i < neighbours.length; i++) {
+                    if (neighbours[i] > -1) {
+                        if ((TheCells[neighbours[i]].CellState == TheCellState.MINE) ||
+                                (TheCells[neighbours[i]].CellState == TheCellState.PENDING)) {
                             isNeighbour = true;
                         }
                     }
                 }
 
-                if ( ! isNeighbour) { return; }
+                if (!isNeighbour) {
+                    return;
+                }
 
                 TheCells[cellNo].CellState = TheCellState.PENDING;
                 UpdateNeighbours(cellNo);
+                mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
 
             }
         };
 
-
-
-        TheCells = new Cell[numCells];
         ThePlayers = new Player[PLAYERS];
+        TheCells = new Cell[numCells];
 
-        for (int j = 0; j < ThePlayers.length; j++) {
-            ThePlayers[j] = new Player();
-        }
-
-
-
-
-        TableLayout tl= (TableLayout) findViewById(R.id.tableLayout);
+        TableLayout tl = (TableLayout) findViewById(R.id.tableLayout);
         TableRow tr = new TableRow(this); //TODO remove this line and suppress the resultant warning
 
-        for (int i=0; i< numCells; i++) {
+        for (int i = 0; i < numCells; i++) {
 
             Log.i(MainActivity.TAG, String.format("Loop Row %2d", i));
 
-            if (i%COLUMNS == 0) {
+            if (i % COLUMNS == 0) {
                 tr = new TableRow(this);
 
 
@@ -167,38 +205,62 @@ public class GameActivity extends AppCompatActivity {
             ib.setId(View.generateViewId());
 
 
-              ib.setTag(i);
-              TheCells[i] = new Cell(ib.getId());
+            ib.setTag(i);
+            TheCells[i] = new Cell(ib.getId());
 
-              tr.addView(ib);
+            tr.addView(ib);
 
-              ib.setLayoutParams(new TableRow.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, width_weight));
-              ib.setScaleType(ImageView.ScaleType.FIT_XY);
-     //         ib.att(style="?android:attr/borderlessButtonStyle");
-              int id = getResources().getIdentifier("blank", "drawable", this.getPackageName());
+            ib.setLayoutParams(new TableRow.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, width_weight));
+            ib.setScaleType(ImageView.ScaleType.FIT_XY);
+            //         ib.att(style="?android:attr/borderlessButtonStyle");
+            int id = getResources().getIdentifier("blank", "drawable", this.getPackageName());
 
-              ib.setImageResource(id);
-              ib.setAdjustViewBounds(true);
-              ib.setOnClickListener(listener);
+            ib.setImageResource(id);
+            ib.setAdjustViewBounds(true);
+            ib.setOnClickListener(listener);
+
+        }
+
+    }
+
+
+    public void sendStartGameMessage(View view){
+        //TODO, disable this to prevent duplicate messages. There is a state check so additional messages are ignored
+        mMessagingService.submitTx(new Message("SG:", mMoniker).toBabbleTx());
+
+       SetStatusMessage("Waiting for the others");
+    }
+
+
+    private void StartGame() {
+
+//        ThePlayers = new Player[PLAYERS];
+
+/*
+        for (int j = 0; j < ThePlayers.length; j++) {
+            ThePlayers[j] = new Player();
+        }
+
+*/
+        int PlayerCell = -1;
+        for (int PlayerCnt = 0 ; PlayerCnt < PLAYERS ; PlayerCnt++){
+
+
+            int possibleCell = initialSquares[PlayerCnt];
+
+            if (MyPlayerIdx == PlayerCnt) {
+                TheCells[possibleCell].CellState = TheCellState.MINE;
+                PlayerCell = possibleCell;
+            } else {
+                TheCells[possibleCell].CellState = TheCellState.THEIRS;
+                ChangeCellState((possibleCell)); //TODO remove this line whne players are invisible
+            }
+            TheCells[possibleCell].Owner = PlayerCnt;
 
         }
 
 
-
-        int bombCnt = 0;
-
-        do {
-           int possibleCell = new Random().nextInt(numCells);
-           if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
-               TheCells[possibleCell].CellState = TheCellState.BOMB;
-               bombCnt++;
-           }
-        }  while (bombCnt < numberOfBombs) ;
-
-
-// This will need to be deterministic for the multinode approach
-
-        int PlayerCell = -1;
+ /*
         int PlayerCnt = 0;
         do {
             int possibleCell = new Random().nextInt(numCells);
@@ -208,17 +270,55 @@ public class GameActivity extends AppCompatActivity {
                     PlayerCell = possibleCell;
                 } else {
                     TheCells[possibleCell].CellState = TheCellState.THEIRS;
+                    ChangeCellState((possibleCell)); //TODO remove this line whne players are invisible
                 }
                 TheCells[possibleCell].Owner = PlayerCnt;
                 PlayerCnt++;            }
         } while (PlayerCnt < PLAYERS );
 
+   */
 
+        int bombCnt = 0;
+
+        do {
+           int possibleCell = new Random().nextInt(numCells);
+           if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
+               TheCells[possibleCell].CellState = TheCellState.BOMB;
+               ChangeCellState((possibleCell)); //TODO remove this line whne bombs are invisible
+               bombCnt++;
+           }
+        }  while (bombCnt < numberOfBombs) ;
+
+
+// This will need to be deterministic for the multinode approach
+
+        ChangeGameState(GameState.PLAYING);
         // Defer so all the other players are in situ
         UpdateNeighbours(PlayerCell);
 
-        gameState = GameState.PLAYING;
+
         SetStatusMessage("Game On...");
+
+    }
+
+
+
+    private void ChangeGameState(GameState newState){
+        if (newState == gameState) { return ; } //No change do nothing
+
+        gameState = newState;
+
+        if ( ( (newState == GameState.IAMDEAD) || (newState == GameState.GAMEOVER)  ) && ( ! showPlayers ) ) {
+            showPlayers = true;
+
+            for (int i = 0; i < numCells ; i++){
+  //              if ( (TheCells[i].CellState == TheCellState.THEIRS) || (TheCells[i].CellState == TheCellState.BOMB) ) {
+                    ChangeCellState(i);
+  //              }
+            }
+
+
+        }
 
     }
 
@@ -337,25 +437,166 @@ public class GameActivity extends AppCompatActivity {
         ImageView ib = (ImageView) findViewById(TheCells[CellNo].ID);
 
         switch(TheCells[CellNo].CellState) {
-      //      case PENDING:
-        //        imageName = "pending";
-          //      break;
+            case PENDING:
+                if ((gameState == GameState.IAMDEAD)||(gameState == GameState.GAMEOVER)) {
+                    imageName = "person" + Integer.toString(MyPlayerIdx);
+                } else {
+
+                    //NB this will be
+                    //                   imageName = "pending";
+                    int neighbours = TheCells[CellNo].Neighbours;
+                    imageName = "cell" + Integer.toString(neighbours);
+                }
+                break;
             case EMPTY:
                 imageName = "blank";
                 break;
             case BOMB:
-                imageName = "blank";
+                if (showPlayers) {
+                    imageName = "bomb";
+                } else {
+                    imageName = "blank";
+                }
+
+                break;
             case THEIRS:
-                imageName = "blank";
-            default:
-                int neighbours = TheCells[CellNo].Neighbours;
-                imageName = "cell" + Integer.toString(neighbours);
+                if (showPlayers) {
+                    //  imageName = "person";  //TODO set to blank to make invisible
+                     imageName = "person" + Integer.toString(TheCells[CellNo].Owner%7);
+
+
+                } else {
+                    imageName = "blank";
+                }
+                break;
+            default:   // MINE
+                if ((gameState == GameState.IAMDEAD)||(gameState == GameState.GAMEOVER)) {
+                    imageName = "person" + Integer.toString(MyPlayerIdx);
+                } else {
+                    int neighbours = TheCells[CellNo].Neighbours;
+                    imageName = "cell" + Integer.toString(neighbours);
+                }
         }
 
 
         int id = getResources().getIdentifier(imageName, "drawable", ib.getContext().getPackageName());
         ib.setImageResource(id);
 
+    }
+
+    @Override
+    public void stateUpdated() {
+        final Message message = mMessagingService.state.getLatestMessage();
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ProcessMessage(message);
+            }
+        });
+
+
+
+    }
+
+ /*
+    Colon separated string - its good enough for this complexity
+
+ Parameter 1:
+    MsgType
+        AG : Announce Game
+        AP : Announce Player
+        SQ : Claim Square
+        OM : Out of Moves
+        SG : Start Game
+
+   Each of these are then documented separately:
+
+   SQ
+   ==
+
+   Parameter 1: SQ
+   Parameter 2: Player No
+   Parameter 3: Cell No
+
+ */
+
+    public void ProcessMessage(Message message) {
+
+        String msgText = message.getText();
+        Log.i(MainActivity.TAG, msgText);
+
+        String[] arrMessage = msgText.split(":", 3);
+
+        if (arrMessage.length > 0){
+
+            switch (arrMessage[0]) {
+                case "SQ":   // Claiming a Square
+                      if (arrMessage.length == 3) {   // Must be 3 to be well formed
+                          int playerNo = Integer.parseInt(arrMessage[1]);
+                          int cellNo = Integer.parseInt(arrMessage[2]);
+
+                          if (playerNo == MyPlayerIdx){
+                              processPendingCellMessage(cellNo);
+                          } else {
+                              processTheirCellMessage(playerNo, cellNo);
+                          }
+                      }
+
+                    break;
+                case "SG": // No parameters required - we just start
+                    if (gameState == GameState.WAITINGTOSTART) {
+                        StartGame();
+                    }
+                    break;
+                default:
+                    Log.e(MainActivity.TAG, "Unknown Babble Message: "+msgText);
+
+            }
+
+        }
+
+    }
+
+
+    public void processPendingCellMessage(int cellNo){
+        switch (TheCells[cellNo].CellState) {
+            case PENDING:   //Alls Fine
+                TheCells[cellNo].CellState = TheCellState.MINE;
+                ChangeCellState(cellNo);
+            break;
+            case THEIRS:    // We dead
+                ChangeGameState(GameState.IAMDEAD);
+                SetStatusMessage("Someone else is here. You lose");
+            break;
+            default:
+                // This has gone wrong
+
+        }
+
+
+
+    }
+
+
+    public void processTheirCellMessage(int playerNo, int cellNo){
+
+    }
+
+
+
+
+    @Override
+    public void onBackPressed() {
+        mMessagingService.leave(null);
+        super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        mMessagingService.removeObserver(this);
+
+        super.onDestroy();
     }
 
 

@@ -22,6 +22,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+
+//TODO remove this - it was the old pre-babble invocation code
+
     public void startGameClick(View view) {
         Intent intent = new Intent(this, GameActivity.class);
         Log.i(TAG, "Start Game Click");
@@ -30,6 +33,24 @@ public class MainActivity extends AppCompatActivity {
    //     intent.putExtra(EXTRA_MESSAGE, message);
         startActivity(intent);
     }
+
+
+    public void startNewNetworkClick(View view) {
+        Intent intent = new Intent(this, NewNetworkActivity.class);
+        Log.i(TAG, "startNewNetworkClick");
+        startActivity(intent);
+    }
+
+
+    public void joinNetworkClick(View view) {
+        Intent intent = new Intent(this, JoinNetworkActivity.class);
+        Log.i(TAG, "joinNetworkClick");
+        startActivity(intent);
+    }
+
+
+
+
 
 
     public void btTestClick(View view) {

@@ -19,17 +19,44 @@
 
     </TableLayout>
 
-    <TextView
-        android:id="@+id/statusText"
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:focusable="false"
-        android:inputType="none"
-        android:text=""
         android:layout_weight="10"
-        android:textIsSelectable="false"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/tableLayout" />
+        app:layout_constraintStart_toEndOf="@+id/tableLayout" >
+
+
+        <ImageButton
+            android:id="@+id/btNew"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_margin="4dp"
+            android:background="#880E4F"
+            android:contentDescription="Start Game"
+            android:onClick="sendStartGameMessage"
+            android:scaleType="fitXY"
+            android:scaleX="1"
+            android:scaleY="1"
+            app:srcCompat="@android:drawable/ic_media_play" />
+
+
+
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:inputType="none"
+            android:text=""
+            android:textIsSelectable="false" />
+
+
+
+    </LinearLayout>
 
 </LinearLayout>
