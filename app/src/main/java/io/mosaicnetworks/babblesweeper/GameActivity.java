@@ -376,6 +376,24 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     }
 
 
+    private void SetScoreMessage() {
+
+        String myScore = "";
+        String theirScore = "";
+        for (int i = 0; i < ThePlayers.length; i++ ) {
+            if ( i == MyPlayerIdx) {
+                myScore = Integer.toString(ThePlayers[i].squares);
+            } else {
+                theirScore += " : "+Integer.toString(ThePlayers[i].squares);
+            }
+        }
+
+
+
+        TextView tv= (TextView) findViewById(R.id.scoreText);
+        tv.setText(myScore + " " + theirScore);
+    }
+
 
 
     private int[] NeighbouringCells(int cellNo) {
@@ -661,6 +679,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 ThePlayers[MyPlayerIdx].squares++;
                 isPending = false;
                 ChangeCellState(cellNo);
+                SetScoreMessage();
             break;
             case THEIRS:    // We dead
                 ChangeGameState(GameState.IAMDEAD);
@@ -694,6 +713,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 TheCells[cellNo].Owner = playerNo;
                 ThePlayers[playerNo].squares++;
                 UpdateNeighboursNeighbours(cellNo);
+                SetScoreMessage();
                 break;
         }
     }

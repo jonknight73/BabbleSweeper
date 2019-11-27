@@ -8,13 +8,37 @@
     android:orientation="vertical"
     tools:context=".GameActivity">
 
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="10"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/tableLayout" >
+
+
+        <TextView
+            android:id="@+id/scoreText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:inputType="none"
+            android:text=""
+            android:textIsSelectable="false" />
+
+
+    </LinearLayout>
+
+
     <TableLayout
         android:id="@+id/tableLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="693dp"
 
         android:layout_gravity="center|center_horizontal|fill_horizontal|fill_vertical"
-        android:layout_weight="90">
+        android:layout_weight="80">
 
 
     </TableLayout>
@@ -36,7 +60,7 @@
             android:layout_height="32dp"
             android:layout_margin="4dp"
             android:background="#880E4F"
-            android:contentDescription="Start Game"
+            android:contentDescription="@string/start_game"
             android:onClick="sendStartGameMessage"
             android:scaleType="fitXY"
             android:scaleX="1"
@@ -44,12 +68,11 @@
             app:srcCompat="@android:drawable/ic_media_play" />
 
 
-
-
         <TextView
             android:id="@+id/statusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="70"
             android:focusable="false"
             android:inputType="none"
             android:text=""

@@ -12,7 +12,7 @@ import io.mosaicnetworks.babble.node.KeyPair;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final String TAG = "BabbleSweeper-NOV25";
+    public static final String TAG = "BabbleSweeper-NOV27";
 
 
     @Override
@@ -21,18 +21,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
     }
 
-
-
-//TODO remove this - it was the old pre-babble invocation code
-
-    public void startGameClick(View view) {
-        Intent intent = new Intent(this, GameActivity.class);
-        Log.i(TAG, "Start Game Click");
-
-   //     EditText editText = (EditText) findViewById(R.id.editText);
-   //     intent.putExtra(EXTRA_MESSAGE, message);
-        startActivity(intent);
-    }
 
 
     public void startNewNetworkClick(View view) {
@@ -48,16 +36,6 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-
-
-
-
-
-    public void btTestClick(View view) {
-
-        KeyPair kp = new KeyPair();
-        Log.i("Yippee",kp.privateKey);
-    }
 
 
 }

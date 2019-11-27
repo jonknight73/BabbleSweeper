@@ -4,7 +4,9 @@ import androidx.annotation.StringRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -16,6 +18,16 @@ public class NewNetworkActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_new_network);
+
+        SharedPreferences sharedPref = NewNetworkActivity.this.getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+
+
+        EditText editText = findViewById(R.id.editText);
+        editText.setText(sharedPref.getString("moniker", "Me"));
+
+
+        Log.i(MainActivity.TAG, "Moniker: " + editText.getText());
     }
 
     // called when the user presses the start chat button
@@ -39,6 +51,18 @@ public class NewNetworkActivity extends AppCompatActivity {
             displayOkAlertDialog(R.string.babble_busy_title, R.string.babble_busy_message);
             return;
         }
+
+
+     // Store moniker entered
+        SharedPreferences sharedPref = NewNetworkActivity.this.getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putString("moniker", moniker);
+        editor.commit();
+
+        Log.i(MainActivity.TAG, "Moniker: " + moniker);
+
 
         messagingService.start();
         Intent intent = new Intent(this, GameActivity.class);

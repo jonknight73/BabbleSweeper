@@ -69,14 +69,14 @@ public class JoinNetworkActivity extends AppCompatActivity  implements ResponseL
     private void getPeers(final String peerIP) {
         try {
             mHttpGenesisPeerDiscoveryRequest = HttpPeerDiscoveryRequest.createGenesisPeersRequest(peerIP,
-                    BabbleService.DISCOVERY_PORT, new ResponseListener() {
+                    BabbleService.DEFAULT_DISCOVERY_PORT, new ResponseListener() {
                         @Override
                         public void onReceivePeers(List<Peer> genesisPeers) {
                             mGenesisPeers = genesisPeers;
 
                             mHttpCurrentPeerDiscoveryRequest =
                                     HttpPeerDiscoveryRequest.createCurrentPeersRequest(
-                                            peerIP, BabbleService.DISCOVERY_PORT,
+                                            peerIP, BabbleService.DEFAULT_DISCOVERY_PORT,
                                             JoinNetworkActivity.this, JoinNetworkActivity.this);
 
                             mHttpCurrentPeerDiscoveryRequest.send();
@@ -173,6 +173,7 @@ public class JoinNetworkActivity extends AppCompatActivity  implements ResponseL
     @Override
     protected void onDestroy() {
         cancelRequets();
+
         super.onDestroy();
     }
 

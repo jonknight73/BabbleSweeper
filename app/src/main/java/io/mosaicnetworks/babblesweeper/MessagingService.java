@@ -8,12 +8,13 @@ public final class MessagingService extends BabbleService<AppState> {
 
     private static MessagingService INSTANCE;
 
-    private static String MyPublicKey = Double.toString(Math.random());
+    private static String MyPublicKey = "";
 
     public static String publicKey() {
+        if (MyPublicKey == "") {
+            MyPublicKey = getInstance().getPublicKey();
+        }
         return MyPublicKey;
-        //TODO this is a hack. When publicKey is avbailable in BabbleService, the method should be
-        // inherited and we can lose the random number.
     }
 
 
