@@ -1,8 +1,10 @@
 package io.mosaicnetworks.babblesweeper;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -41,6 +43,17 @@ public class JoinNetworkActivity extends AppCompatActivity  implements ResponseL
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_join_network);
         initLoadingDialog();
+
+        SharedPreferences sharedPref = JoinNetworkActivity.this.getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+
+
+        EditText editText = findViewById(R.id.editMoniker);
+        editText.setText(sharedPref.getString("moniker", "Me"));
+        EditText editTextHost = findViewById(R.id.editHost);
+        editTextHost.setText(sharedPref.getString("host", "192.168.1.21"));
+
+
     }
 
 // joinNetworkClick
@@ -62,6 +75,16 @@ public class JoinNetworkActivity extends AppCompatActivity  implements ResponseL
             displayOkAlertDialog(R.string.no_hostname_alert_title, R.string.no_hostname_alert_message);
             return;
         }
+
+        // Store moniker entered
+        SharedPreferences sharedPref = JoinNetworkActivity.this.getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putString("moniker", mMoniker);
+        editor.putString("host", peerIP);
+        editor.commit();
+
 
         getPeers(peerIP);
     }

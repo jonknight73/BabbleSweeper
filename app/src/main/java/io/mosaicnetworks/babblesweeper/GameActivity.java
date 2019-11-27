@@ -3,9 +3,11 @@ package io.mosaicnetworks.babblesweeper;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ImageView;
 import android.widget.TableLayout;
@@ -13,6 +15,7 @@ import android.widget.TableRow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.security.spec.ECField;
 import java.util.Random;
 
 import io.mosaicnetworks.babble.node.BabbleService;
@@ -24,10 +27,10 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     int ROWS = 12;
     int numCells = COLUMNS * ROWS;
 
-    int numberOfBombs = 10;
+    int numberOfBombs = 16;
 
 
-    int MAXPLAYERS = 7;
+    int MAXPLAYERS = 4;
     int PLAYERS = 0;
 
     int initialSquares[] = {COLUMNS + 1, numCells - 2 - COLUMNS, (2*COLUMNS)-2, numCells - COLUMNS - COLUMNS + 1};
@@ -149,13 +152,17 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 switch (TheCells[cellNo].CellState) {
                     case THEIRS:
                         ChangeGameState(GameState.IAMDEAD);
+                        ThePlayers[MyPlayerIdx].isDead = true;
                         mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
                         SetStatusMessage("Someone else is here. You lose");
+                        CheckIfGameOver();
                         return;
                     case BOMB:
                         ChangeGameState(GameState.IAMDEAD);
+                        ThePlayers[MyPlayerIdx].isDead = true;
                         mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
                         SetStatusMessage("BOMB! You lose");
+                        CheckIfGameOver();
                         return;
                     case MINE:
                         return;
@@ -248,7 +255,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         mMessagingService.submitTx(new Message("SG:"+bombString, mMoniker).toBabbleTx());
 
-       SetStatusMessage("Waiting for the others");
+        SetStatusMessage("Waiting for the others");
     }
 
 
@@ -333,13 +340,20 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         }
 
 
-
+        SetScoreMessage();
 
 
 // This will need to be deterministic for the multinode approach
 
         ChangeGameState(GameState.PLAYING);
         // Defer so all the other players are in situ
+
+        ImageButton buttStart= (ImageButton) findViewById(R.id.btNew);
+      //  buttStart.setColorFilter(Color.argb(127, 127,127,127));
+        buttStart.setImageAlpha(50);
+        buttStart.setOnClickListener(null);
+
+
         UpdateNeighbours(PlayerCell);
 
 
@@ -380,12 +394,14 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         String myScore = "";
         String theirScore = "";
-        for (int i = 0; i < ThePlayers.length; i++ ) {
-            if ( i == MyPlayerIdx) {
-                myScore = Integer.toString(ThePlayers[i].squares);
-            } else {
-                theirScore += " : "+Integer.toString(ThePlayers[i].squares);
-            }
+        for (int i = 0; i < PLAYERS; i++ ) {
+           try {
+               if (i == MyPlayerIdx) {
+                   myScore = Integer.toString(ThePlayers[i].squares);
+               } else {
+                   theirScore += " : " + Integer.toString(ThePlayers[i].squares);
+               }
+           } catch (Exception e) { Log.e(MainActivity.TAG, e.getMessage()) ;}
         }
 
 
@@ -682,8 +698,11 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 SetScoreMessage();
             break;
             case THEIRS:    // We dead
+
                 ChangeGameState(GameState.IAMDEAD);
+                ThePlayers[MyPlayerIdx].isDead = true;
                 SetStatusMessage("Someone else is here. You lose");
+                CheckIfGameOver();
             break;
             default:
                 // This has gone wrong
@@ -691,6 +710,35 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         }
 
 
+
+    }
+
+
+    public void CheckIfGameOver() {
+
+        boolean aPlayerIsNotDead = false;
+        int biggest = 0;
+        String biggestName = "";
+
+        for (int i=0;i<PLAYERS;i++) {
+            if (! ThePlayers[i].isDead) {
+                aPlayerIsNotDead = true;
+            }
+            if (ThePlayers[i].squares > biggest) {
+                biggest = ThePlayers[i].squares;
+                biggestName = ThePlayers[i].moniker;
+            } else {
+                if  (ThePlayers[i].squares == biggest) {
+                    biggestName += ", " + ThePlayers[i].moniker;
+                }
+            }
+
+        }
+
+        if (aPlayerIsNotDead) { return ; }
+
+        ChangeGameState(GameState.GAMEOVER);
+        SetStatusMessage("Game Over, " + biggestName + " wins");
 
     }
 
@@ -705,6 +753,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
             case MINE:
             case BOMB:
                 ThePlayers[playerNo].isDead = true;
+                CheckIfGameOver();
                 break;
             case PENDING:
                 // Do nothing - when it reached consensus, you will die
@@ -719,6 +768,11 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     }
 
 
+    public void quitGame(View view) {
+        mMessagingService.leave(null);
+        super.onBackPressed();
+
+    }
 
 
     @Override
