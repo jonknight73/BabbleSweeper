@@ -11,9 +11,10 @@
 
 
     <LinearLayout
+        android:id="@+id/topLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="15"
+        android:layout_weight="10"
         android:forceDarkAllowed="false"
         android:gravity="center_vertical|center_horizontal"
         android:orientation="horizontal"
@@ -33,7 +34,7 @@
             android:inputType="none"
             android:text="Score:"
             android:textIsSelectable="false"
-            android:textSize="30dp" />
+            android:textSize="20dp" />
 
         <TextView
             android:id="@+id/scoreText"
@@ -46,7 +47,7 @@
             android:inputType="none"
             android:text=""
             android:textIsSelectable="false"
-            android:textSize="30dp" />
+            android:textSize="20dp" />
 
 
     </LinearLayout>
@@ -55,19 +56,24 @@
     <TableLayout
         android:id="@+id/tableLayout"
         android:layout_width="match_parent"
-        android:layout_height="693dp"
+        android:layout_height="0dp"
 
+        app:layout_constraintEnd_toStartOf="@+id/bottomLayout"
+        app:layout_constraintStart_toEndOf="@+id/topLayout"
+        app:layout_constraintTop_toBottomOf="@+id/topLayout"
+        app:layout_constraintBottom_toTopOf="@+id/bottomLayout"
         android:layout_gravity="center|center_horizontal|fill_horizontal|fill_vertical"
-        android:layout_weight="70">
+        android:layout_weight="80">
 
 
     </TableLayout>
 
 
     <LinearLayout
+        android:id="@+id/bottomLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="15"
+        android:layout_weight="10"
         android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -98,7 +104,7 @@
             android:inputType="none"
             android:text=""
             android:textIsSelectable="false"
-            android:textSize="30dp" />
+            android:textSize="20dp" />
 
 
         <ImageButton
