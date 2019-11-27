@@ -26,7 +26,9 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
     int numberOfBombs = 10;
 
-    int PLAYERS = 4;
+
+    int MAXPLAYERS = 7;
+    int PLAYERS = 0;
 
     int initialSquares[] = {COLUMNS + 1, numCells - 2 - COLUMNS, (2*COLUMNS)-2, numCells - COLUMNS - COLUMNS + 1};
 
@@ -56,6 +58,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     }
 
 
+
+
     class Player {
         String PublicKey;
         int squares = 1;
@@ -68,6 +72,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     Player ThePlayers[];
 
     int MyPlayerIdx = 0;
+    boolean isPending = false;
+
 
     GameState gameState;
 
@@ -104,9 +110,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         }
 
 
-//        randSeed = Double.parseDouble(Math.random());
         mMessagingService.submitTx(new Message("AP:" + mMoniker + ":" +
-                Integer.toString(MyPlayerIdx), mMoniker).toBabbleTx());
+                mMessagingService.publicKey(), mMoniker).toBabbleTx());
 
 
 
@@ -125,6 +130,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         int width_weight = 100 / COLUMNS;
         int height_weight = 80 / ROWS;
         showPlayers = false;
+        PLAYERS = 0;
+        isPending = false;
 
         View.OnClickListener listener = new View.OnClickListener() {
             @Override
@@ -136,6 +143,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 if (gameState != GameState.PLAYING) {
                     return;
                 }
+
+                if (isPending) {return ; }
 
                 switch (TheCells[cellNo].CellState) {
                     case THEIRS:
@@ -174,13 +183,14 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 }
 
                 TheCells[cellNo].CellState = TheCellState.PENDING;
+                isPending = true;
                 UpdateNeighbours(cellNo);
                 mMessagingService.submitTx(new Message("SQ:" + Integer.toString(MyPlayerIdx) + ":" + Integer.toString(cellNo), mMoniker).toBabbleTx());
 
             }
         };
 
-        ThePlayers = new Player[PLAYERS];
+        ThePlayers = new Player[MAXPLAYERS];
         TheCells = new Cell[numCells];
 
         TableLayout tl = (TableLayout) findViewById(R.id.tableLayout);
@@ -188,7 +198,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         for (int i = 0; i < numCells; i++) {
 
-            Log.i(MainActivity.TAG, String.format("Loop Row %2d", i));
+//            Log.i(MainActivity.TAG, String.format("Loop Row %2d", i));
 
             if (i % COLUMNS == 0) {
                 tr = new TableRow(this);
@@ -226,15 +236,25 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
     public void sendStartGameMessage(View view){
         //TODO, disable this to prevent duplicate messages. There is a state check so additional messages are ignored
-        mMessagingService.submitTx(new Message("SG:", mMoniker).toBabbleTx());
+
+
+
+        int targetBombs = 2 * numberOfBombs;
+        String bombString = Integer.toString(numberOfBombs);
+
+        for (int i = 0; i < targetBombs; i++) {
+            bombString += "¬"+Integer.toString(new Random().nextInt(numCells));
+        }
+
+        mMessagingService.submitTx(new Message("SG:"+bombString, mMoniker).toBabbleTx());
 
        SetStatusMessage("Waiting for the others");
     }
 
 
-    private void StartGame() {
+    private void StartGame(String bombString) {
 
-//        ThePlayers = new Player[PLAYERS];
+//        ThePlayers = new Player[MAXPLAYERS];
 
 /*
         for (int j = 0; j < ThePlayers.length; j++) {
@@ -278,16 +298,42 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
    */
 
-        int bombCnt = 0;
 
-        do {
-           int possibleCell = new Random().nextInt(numCells);
-           if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
-               TheCells[possibleCell].CellState = TheCellState.BOMB;
-               ChangeCellState((possibleCell)); //TODO remove this line whne bombs are invisible
-               bombCnt++;
-           }
-        }  while (bombCnt < numberOfBombs) ;
+        // The bomb string is a ¬ delimited list of numbers. The first is the max number of bombs.
+        // The rest are random cells. The node starting the game generates them. Once we get max
+        // number of bombs we stop adding. If the string runs out before we reach max number, then
+        // we make do with what we have.
+
+        Log.i(MainActivity.TAG, bombString);
+
+        String[] arrBombs = bombString.split("¬");
+
+        if (arrBombs.length > 2) {  // If less than 2 params there are no bombs defined
+            try {
+                numberOfBombs = Integer.parseInt(arrBombs[0]);
+            } catch (Exception e) {
+                Log.e(MainActivity.TAG, e.getMessage()) ;
+                numberOfBombs = 10;
+            }
+            int bombIdx = 0;
+            int bombCnt = 0;
+
+            do {
+                int possibleCell = Integer.parseInt(arrBombs[bombIdx]);
+                if ( TheCells[possibleCell].CellState == TheCellState.EMPTY ) {
+                    TheCells[possibleCell].CellState = TheCellState.BOMB;
+                    ChangeCellState(possibleCell);
+                    bombCnt++;
+                }
+                bombIdx++;
+            }  while ((bombCnt < numberOfBombs)&&(bombIdx < arrBombs.length )) ;
+
+            numberOfBombs = bombCnt;
+
+        }
+
+
+
 
 
 // This will need to be deterministic for the multinode approach
@@ -407,15 +453,27 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
 
-    private void UpdateNeighbours(int cellNo) {
-        // ROWS, COLUMNS
+
+
+    private void UpdateNeighboursNeighbours(int cellNo) {
         int neighbours[] = NeighbouringCells(cellNo);
 
+        for (int j = 0; j< neighbours.length; j++) {
+            if (neighbours[j] >= 0) {
+                UpdateNeighbours(neighbours[j]);
+            }
+        }
+    }
+
+
+
+    private void UpdateNeighbours(int cellNo) {
+        // ROWS, COLUMNS
                 int neighbourCount = 0;
-                int neighbourNeighbours[] = NeighbouringCells(cellNo);
-                for (int j = 0; j< neighbourNeighbours.length; j++) {
-                    if (neighbourNeighbours[j] >= 0) {
-                        Cell thisCell = TheCells[neighbourNeighbours[j]];
+                int neighbours[] = NeighbouringCells(cellNo);
+                for (int j = 0; j< neighbours.length; j++) {
+                    if (neighbours[j] >= 0) {
+                        Cell thisCell = TheCells[neighbours[j]];
 
                         if ( (thisCell.CellState == TheCellState.BOMB) ||
                                 (thisCell.CellState == TheCellState.THEIRS)) {
@@ -441,11 +499,9 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                 if ((gameState == GameState.IAMDEAD)||(gameState == GameState.GAMEOVER)) {
                     imageName = "person" + Integer.toString(MyPlayerIdx);
                 } else {
-
-                    //NB this will be
-                    //                   imageName = "pending";
-                    int neighbours = TheCells[CellNo].Neighbours;
-                    imageName = "cell" + Integer.toString(neighbours);
+                    imageName = "pending";
+                 //   int neighbours = TheCells[CellNo].Neighbours;
+                 //   imageName = "cell" + Integer.toString(neighbours);
                 }
                 break;
             case EMPTY:
@@ -462,8 +518,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
             case THEIRS:
                 if (showPlayers) {
                     //  imageName = "person";  //TODO set to blank to make invisible
-                     imageName = "person" + Integer.toString(TheCells[CellNo].Owner%7);
-
+                     imageName = "person" + Integer.toString(TheCells[CellNo].Owner);
+                     Log.i(MainActivity.TAG, imageName);
 
                 } else {
                     imageName = "blank";
@@ -472,6 +528,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
             default:   // MINE
                 if ((gameState == GameState.IAMDEAD)||(gameState == GameState.GAMEOVER)) {
                     imageName = "person" + Integer.toString(MyPlayerIdx);
+                    Log.i(MainActivity.TAG, imageName);
                 } else {
                     int neighbours = TheCells[CellNo].Neighbours;
                     imageName = "cell" + Integer.toString(neighbours);
@@ -544,10 +601,47 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                       }
 
                     break;
-                case "SG": // No parameters required - we just start
-                    if (gameState == GameState.WAITINGTOSTART) {
-                        StartGame();
+                case "SG":
+                    if (arrMessage.length == 2) { // Must be 3 to be well formed
+
+                        if (gameState == GameState.WAITINGTOSTART) {
+                            StartGame(arrMessage[1]);
+                        }
                     }
+                    break;
+
+                case "AP":  // Add Player
+                    if (arrMessage.length == 3) {   // Must be 3 to be well formed
+                        Player player = new Player();
+                        player.PublicKey = arrMessage[2];
+                        player.moniker = arrMessage[1];
+
+                        if ( PLAYERS >= MAXPLAYERS) {
+                            break;
+                        }
+
+                        for (int i = 0; i < PLAYERS; i++) {
+                            if (player.PublicKey.equals(ThePlayers[i].PublicKey)) { return ;} // no duplicates
+                        }
+
+
+                        ThePlayers[PLAYERS] = player;
+                        PLAYERS++;
+
+                        if ( player.PublicKey.equals(mMessagingService.publicKey()) ) {
+                            MyPlayerIdx = PLAYERS - 1;
+                            SetStatusMessage("You have joined, "+player.moniker);
+                        } else {
+                            Log.i(MainActivity.TAG, player.PublicKey);
+                            Log.i(MainActivity.TAG, mMessagingService.publicKey());
+
+                            SetStatusMessage(player.moniker + " has joined. We have " + Integer.toString(PLAYERS) + " players.");
+                        }
+                    }
+
+//                mMessagingService.submitTx(new Message("AP:" + mMoniker + ":" +
+  //                      mMessagingService.publicKey(), mMoniker).toBabbleTx());
+
                     break;
                 default:
                     Log.e(MainActivity.TAG, "Unknown Babble Message: "+msgText);
@@ -560,9 +654,12 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
     public void processPendingCellMessage(int cellNo){
+        if (ThePlayers[MyPlayerIdx].isDead) {return;}
         switch (TheCells[cellNo].CellState) {
             case PENDING:   //Alls Fine
                 TheCells[cellNo].CellState = TheCellState.MINE;
+                ThePlayers[MyPlayerIdx].squares++;
+                isPending = false;
                 ChangeCellState(cellNo);
             break;
             case THEIRS:    // We dead
@@ -581,6 +678,24 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
     public void processTheirCellMessage(int playerNo, int cellNo){
 
+        if (ThePlayers[playerNo].isDead) { return ;}
+        switch (TheCells[cellNo].CellState) {
+            case THEIRS:
+                if (TheCells[cellNo].Owner == playerNo) {return;}
+                // NB deliberately no break statement
+            case MINE:
+            case BOMB:
+                ThePlayers[playerNo].isDead = true;
+                break;
+            case PENDING:
+                // Do nothing - when it reached consensus, you will die
+            case EMPTY:
+                TheCells[cellNo].CellState = TheCellState.THEIRS;
+                TheCells[cellNo].Owner = playerNo;
+                ThePlayers[playerNo].squares++;
+                UpdateNeighboursNeighbours(cellNo);
+                break;
+        }
     }
 
 
