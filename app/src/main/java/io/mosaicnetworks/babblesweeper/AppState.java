@@ -70,4 +70,11 @@ public class AppState implements BabbleState {
         System.arraycopy(b, 0, tempHash, 0, b.length);
         return mSha256Digest.digest(tempHash);
     }
+
+    @Override
+    public void reset() {
+        //do nothing
+    }
+
+
 }
