@@ -75,6 +75,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="10"
         android:orientation="horizontal"
+        android:paddingTop="20dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/tableLayout">
@@ -97,10 +98,10 @@
         <TextView
             android:id="@+id/statusText"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="70"
-            android:fontFamily="@font/custom_font"
             android:focusable="false"
+            android:fontFamily="@font/custom_font"
             android:inputType="none"
             android:text=""
             android:textIsSelectable="false"
