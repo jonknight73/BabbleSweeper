@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -16,6 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.security.spec.ECField;
+import java.util.List;
 import java.util.Random;
 
 import io.mosaicnetworks.babble.node.BabbleService;
@@ -35,6 +37,8 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     int MAXPLAYERS = 8;
     int PLAYERS = 0;
 
+
+    private Integer mMessageIndex = 0;
 
     // Initial squares
     // The player order is agreed by the consensus engine, so using a deterministic list make sense.
@@ -343,6 +347,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
                 tr.setLayoutParams(new TableLayout.LayoutParams(0, TableLayout.LayoutParams.FILL_PARENT, height_weight));
+                tr.setGravity(Gravity.CENTER_HORIZONTAL);
                 tr.setWeightSum(100);
                 tl.addView(tr);
             }
@@ -627,14 +632,21 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     // This function receives messages from Babble, then processes them in the UI thread.
     @Override
     public void stateUpdated() {
-        final Message message = mMessagingService.state.getLatestMessage();
+
+        final List<Message> newMessages = mMessagingService.state.getMessagesFromIndex(mMessageIndex);
 
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                ProcessMessage(message);
+                for (Message message : newMessages ) {
+                    ProcessMessage(message);
+                }
             }
         });
+
+        mMessageIndex = mMessageIndex + newMessages.size();
+
+
 
     }
 

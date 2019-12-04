@@ -9,11 +9,6 @@
         android:roundIcon="@mipmap/ic_logo_round"
         android:supportsRtl="true"
         android:theme="@style/AppThemeNoTitle">
-        <activity
-            android:name=".JoinNetworkActivity"
-            android:screenOrientation="portrait"
-            android:label="@string/title_activity_join_network"/>
-        <activity android:name=".NewNetworkActivity"  android:screenOrientation="portrait"/>
         <activity android:name=".GameActivity" android:screenOrientation="portrait"
             android:theme="@style/AppThemeNoTitle" />
         <activity android:name=".MainActivity" android:screenOrientation="portrait">
