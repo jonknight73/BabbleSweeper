@@ -636,6 +636,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
             }
         });
 
+
     }
 
  /*
