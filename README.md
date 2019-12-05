@@ -1,28 +1,14 @@
-# BabbleSweeper
+# Sweeper
 
 **This code is under development and you are using it at your own risk**
 
-
-
-
-//TODO Here we will discuss starting a babble node. But as the babble node is not integrated in the
-code yet, we will discuss that afterwards.
-
-
-
-----
-
 ## How to Play
 
-Open the app. There are 2 icons on the opening screen: 
-
-//TODO image of **New**   //TODO image of **JOIN**
+Open the app. There are 2 buttons on the opening screen: 
 
 The **New** button creates a new Babble network. The **Join** button allows you to join an existing Babble Network.
 
 ### New Network
-
-//TODO screenshot of new node
 
 To start a new network, you just need to enter a moniker - a more user friendly name to identify you by. Monikers are not guaranteed to be unique -- they are only used to for display purposes.
 
@@ -31,8 +17,6 @@ The moniker will be prefilled with the last value entered.
 Upon pressing the ``START`` button, the Game Screen loads.
 
 ### Join Network
-
-//TODO screenshot of join node
 
 The moniker is a nickname as described in the previous section. 
 
@@ -64,7 +48,7 @@ The score is in the top right. Your score is the first one.
 
 ## Developer Notes
 
-The current release of Sweeper is built using version 0.2.1 of [babble-android](https://github.com/mosaicnetworks/babble-android). 
+The current release of Sweeper is built using version 0.2.5 of [babble-android](https://github.com/mosaicnetworks/babble-android). 
 
 Subsequent releases have moved a fair quantity of the boilerplate code into the library. If you are looking for a model project to build a babble app, [babble-android-tutorial](https://github.com/mosaicnetworks/babble-android-tutorial) is a better choice. 
 
