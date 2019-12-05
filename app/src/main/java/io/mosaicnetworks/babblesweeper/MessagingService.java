@@ -2,6 +2,7 @@ package io.mosaicnetworks.babblesweeper;
 
 import android.util.Log;
 
+import io.mosaicnetworks.babble.node.BabbleConfig;
 import io.mosaicnetworks.babble.node.BabbleService;
 
 public final class MessagingService extends BabbleService<AppState> {
@@ -34,10 +35,8 @@ public final class MessagingService extends BabbleService<AppState> {
         return INSTANCE;
     }
 
-
-
     private MessagingService() {
-        super(new AppState());
+        super(new AppState(), new BabbleConfig.Builder().heartbeat(10).build());
     }
 }
 

@@ -1,41 +1,38 @@
 package io.mosaicnetworks.babblesweeper;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
-import io.mosaicnetworks.babble.node.KeyPair;
+import io.mosaicnetworks.babble.configure.BaseConfigActivity;
+import io.mosaicnetworks.babble.node.BabbleService;
 
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseConfigActivity {
 
     public static final String TAG = "BabbleSweeper-NOV27";
 
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+    public BabbleService getBabbleService() {
+        return MessagingService.getInstance();
     }
 
-
-
-    public void startNewNetworkClick(View view) {
-        Intent intent = new Intent(this, NewNetworkActivity.class);
-        Log.i(TAG, "startNewNetworkClick");
+    @Override
+    public void onJoined(String moniker) {
+        Intent intent = new Intent(this, GameActivity.class);
+        intent.putExtra("MONIKER", moniker);
         startActivity(intent);
     }
 
-
-    public void joinNetworkClick(View view) {
-        Intent intent = new Intent(this, JoinNetworkActivity.class);
-        Log.i(TAG, "joinNetworkClick");
+    @Override
+    public void onStartedNew(String moniker) {
+        Intent intent = new Intent(this, GameActivity.class);
+        intent.putExtra("MONIKER", moniker);
         startActivity(intent);
     }
-
 
 
 }
