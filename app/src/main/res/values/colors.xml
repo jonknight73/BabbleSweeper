@@ -3,5 +3,8 @@
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
-    <color name="colorBackground">#E7EACC</color>
+    <color name="colorBackground">#F5F5E9</color>
+    <color name="colorMyPlayer">#EC6D98</color>
+    <color name="colorTheirPlayer">#275AB6</color>
+    <color name="colorPlayerText">#FFEB3B</color>
 </resources>
