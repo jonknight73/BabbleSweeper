@@ -902,7 +902,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         // No moves found.
 
         ThePlayers[playerNo].isDead = true;
-        mMessagingService.submitTx(new Message("OM:" + Integer.toString(MyPlayerIdx), mMoniker).toBabbleTx()); // Everyone will send one
+        mMessagingService.submitTx(new Message("OM:" + Integer.toString(playerNo), mMoniker).toBabbleTx()); // Everyone will send one
         CheckIfGameOver();
     }
 
