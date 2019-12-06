@@ -26,4 +26,12 @@
     <string name="start_game">Start Game</string>
     <string name="preference_file_key">sweeper</string>
     <string name="quit_game">Quit Game</string>
+    <string name="size_small">Small</string>
+    <string name="size_medium">Medium</string>
+    <string name="size_large">Large</string>
+    <string name="bombs_easy">Few Bombs</string>
+    <string name="bombs_normal">Goldilocks</string>
+    <string name="bombs_hard">Bombtastic</string>
+
+
 </resources>

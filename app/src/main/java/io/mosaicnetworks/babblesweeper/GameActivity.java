@@ -1,16 +1,22 @@
 package io.mosaicnetworks.babblesweeper;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.InputType;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -34,23 +40,12 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     int numberOfBombs = 16;
 
 
-    int MAXPLAYERS = 8;
+    int MAXPLAYERS = 8;  // This is limited by the initialSquares array below rather than babble
     int PLAYERS = 0;
-
 
     private Integer mMessageIndex = 0;
 
-    // Initial squares
-    // The player order is agreed by the consensus engine, so using a deterministic list make sense.
-    int[] initialSquares = { new Point(1,1).ThisCellNo(),
-                             new Point(COLUMNS-2,ROWS-2).ThisCellNo(),
-                             new Point(1,ROWS-2).ThisCellNo(),
-                             new Point(COLUMNS-2,1).ThisCellNo(),
-                             new Point(3,4).ThisCellNo(),
-                             new Point(COLUMNS-3,ROWS-4).ThisCellNo(),
-                             new Point(3,ROWS-4).ThisCellNo(),
-                             new Point(COLUMNS-3,4).ThisCellNo()
-    };
+
 
      //       {COLUMNS + 1, numCells - 2 - COLUMNS, (2*COLUMNS)-2, numCells - COLUMNS - COLUMNS + 1};
 
@@ -61,112 +56,12 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
     // State of each square
-    public enum TheCellState {
+    private enum TheCellState {
         BOMB,
         EMPTY,
         THEIRS,
         PENDING,
         MINE,
-    }
-
-
-    // Internal Class to hold cell state
-    class Cell {
-        TheCellState CellState = TheCellState.EMPTY;
-        int Owner = -1;
-        int Neighbours = 0;
-        int ID = -1;
-
-        public Cell (int id) {
-            this.ID = id;
-        }
-    }
-
-
-    // Internal class to hold player state
-    class Player {
-        String PublicKey;
-        int squares = 1;
-        String moniker;
-        boolean isDead = false;
-    }
-
-
-    // Internal class for co-ordinates
-    // Encaspsulates neighbouring cell algorithm, and conversation to and from Cartesian co-ords
-    class Point {
-        int x;
-        int y;
-
-        Point(int nx, int ny) {
-            this.x = nx;
-            this.y = ny;
-        }
-
-
-        Point(int Cellno) {
-            this.x = Cellno%COLUMNS;
-            this.y = (Cellno - this.x)/COLUMNS;
-        }
-
-        int ThisCellNo() {
-            return CellNo(this.x,this.y);
-        }
-
-        int CellNo(int ax, int ay){
-            return (ay*COLUMNS)+ax;
-        }
-
-
-        // Generates an array of Cell numbers denoting the neighbouring cells. N.B. included self.
-        int[] Neighbours() {
-            int[] rtn = new int[9];
-
-/*
-   0 1 2
-   3 4 5
-   6 7 8
-*/
-
-// Calculate all neighbours ignoring error conditions
-
-            rtn[4] = this.ThisCellNo();
-            rtn[3] = rtn[4] - 1;
-            rtn[5] = rtn[4] + 1;
-            rtn[0] = rtn[3] - COLUMNS;
-            rtn[1] = rtn[4] - COLUMNS;
-            rtn[2] = rtn[5] - COLUMNS;
-            rtn[6] = rtn[3] + COLUMNS;
-            rtn[7] = rtn[4] + COLUMNS;
-            rtn[8] = rtn[5] + COLUMNS;
-
-
-// Now wipe the edge cases
-            if (this.y<1) { // TOP ROW
-               rtn[0] = -1;
-               rtn[1] = -1;
-               rtn[2] = -1;
-            }
-
-            if (this.y>=(ROWS-1)) { // BOTTOM ROW
-                rtn[6] = -1;
-                rtn[7] = -1;
-                rtn[8] = -1;
-            }
-
-            if (this.x<1) { // LEFT COLUMN
-                rtn[0] = -1;
-                rtn[3] = -1;
-                rtn[6] = -1;
-            }
-
-            if (this.x>=(COLUMNS-1)) { // RIGHT COLUMN
-                rtn[2] = -1;
-                rtn[5] = -1;
-                rtn[8] = -1;
-            }
-            return rtn;
-        }
     }
 
 
@@ -176,7 +71,6 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
     int MyPlayerIdx = 0;
     boolean isPending = false;
-
 
     // As it sounds the Game state
     GameState gameState;
@@ -194,7 +88,6 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     // This player's moniker - passed in from JoinNetwork / NewNetwork activity
     private String mMoniker;
 
-
     // MessagingService instance
     private final MessagingService mMessagingService = MessagingService.getInstance();
 
@@ -206,9 +99,11 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         Log.i(MainActivity.TAG, "GameActivity.onCreate");
 
-        // Sets up screen
-        InitialiseBoard();
+        initialisePlayers();
 
+        initialiseStartGameControls();
+        // Set the initial game state
+        gameState = GameState.WAITINGTOSTART;
 
         Intent intent = getIntent();
         mMoniker = intent.getStringExtra("MONIKER");
@@ -221,17 +116,35 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         }
 
 
+
         // Announce this player with an AP (Add Player) message
         mMessagingService.submitTx(new Message("AP:" + mMoniker + ":" +
                 mMessagingService.publicKey(), mMoniker).toBabbleTx());
 
 
-        // Set the initial game state
-        gameState = GameState.WAITINGTOSTART;
+
         SetStatusMessage("Waiting to Start");
 
     }
 
+
+
+    // This function initialises the game state.
+    private void initialisePlayers() {
+        // Make the other players and bombs invisible by default
+        showPlayers = false;
+        // We have no players - all players are added via "Add Player" messages
+        PLAYERS = 0;
+        // Initialise the Players anc Cells array
+        ThePlayers = new Player[MAXPLAYERS];
+    }
+
+
+    private void initialiseStartGameControls() {
+//TODO Add size and bomb number controls
+
+
+    }
 
 // This function initialises the game state.
     private void InitialiseBoard() {
@@ -241,11 +154,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         int width_weight = 100 / COLUMNS;
         int height_weight = 80 / ROWS;
 
-        // Make the other players and bombs invisible by default
-        showPlayers = false;
 
-        // We have no players - all players are added via "Add Player" messages
-        PLAYERS = 0;
 
         // isPending is set when we click a square, and is unset when we receive a message
         // assigning a square to us
@@ -327,12 +236,15 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
 
-        // Initialise the Players anc Cells array
-        ThePlayers = new Player[MAXPLAYERS];
+
         TheCells = new Cell[numCells];
 
         // The TableLayout is defined empty in the layout XML
         TableLayout tl = (TableLayout) findViewById(R.id.tableLayout);
+
+        // clear out what we have
+        tl.removeAllViews();
+
 
         TableRow tr = new TableRow(this); //TODO remove this line and suppress the resultant warning
 
@@ -377,8 +289,67 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     }
 
 
-    public void sendStartGameMessage(View view){
+    public void StartGameClick(View view) {
+        Log.i(MainActivity.TAG, "StartGameClick");
+
+        RadioGroup rg = (RadioGroup) findViewById(R.id.rbSizeGroup);
+        final String value =
+                ((RadioButton)findViewById(rg.getCheckedRadioButtonId()))
+                        .getText().toString();
+
+        RadioGroup rg2 = (RadioGroup) findViewById(R.id.rbBombsGroup);
+        final String value2 =
+                ((RadioButton)findViewById(rg2.getCheckedRadioButtonId()))
+                        .getText().toString();
+
+        sendStartGameMessage(value2, value);
+
+    }
+
+
+    private void sendStartGameMessage(String bombsDesc, String sizeDesc){
         //TODO, disable this to prevent duplicate messages. There is a state check so additional messages are ignored
+
+        final String sizeLarge = getResources().getString(R.string.size_large);
+        final String sizeMedium = getResources().getString(R.string.size_medium);
+ //       final String sizeSmall = getResources().getString(R.string.size_small);
+ //       final String bombsEasy = getResources().getString(R.string.bombs_easy);
+        final String bombsNormal = getResources().getString(R.string.bombs_normal);
+        final String bombsHard = getResources().getString(R.string.bombs_hard);
+
+
+
+
+
+        if (sizeDesc.equals(sizeLarge)) {
+            // Large
+            ROWS=12;COLUMNS=8;numberOfBombs=8;
+        } else {
+
+            if (sizeDesc.equals(sizeMedium)) {
+                // Medium
+                ROWS=10;COLUMNS=6;numberOfBombs=5;
+            } else {
+                // Small
+                ROWS=6;COLUMNS=6;numberOfBombs=3;
+            }
+        }
+
+        numCells = ROWS * COLUMNS;
+
+        if (bombsDesc.equals(bombsHard)) {
+            // Large
+            numberOfBombs *= 3;
+        } else {
+
+            if (bombsDesc.equals(bombsNormal)) {
+                // Medium
+                numberOfBombs *= 2;
+            }
+        }
+
+
+
 
         // The number of bombs and a list of random cell numbers, separated by ¬ is sent as part of
         // the Start Game message. This allows all the noeds to have the same state.
@@ -387,11 +358,11 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         // There is potential concurrency issues here as the number of players is not definitively
         // known until the SG message reaches consensus
         int targetBombs = 2 * numberOfBombs;
-        String bombString = Integer.toString(numberOfBombs);
+        String bombString = Integer.toString(ROWS)+ "¬"+Integer.toString(COLUMNS)+ "¬"+Integer.toString(numberOfBombs);
 
 
         //TODO remove this testing line which boxes in the first player with bombs:
-        // bombString="12¬0¬1¬2¬3¬8¬11¬16¬19¬24¬25¬26¬27";
+        // bombString="12¬8¬12¬0¬1¬2¬3¬8¬11¬16¬19¬24¬25¬26¬27";
 
 
         for (int i = 0; i < targetBombs; i++) {
@@ -406,8 +377,47 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
     private void StartGame(String bombString) {
+        // The bomb string is a ¬ delimited list of numbers. The first is ROW, then COLUMNS, then
+        // the max number of bombs.
+        // The rest are random cells. The node starting the game generates them. Once we get max
+        // number of bombs we stop adding. If the string runs out before we reach max number, then
+        // we make do with what we have.
+
+        Log.i(MainActivity.TAG, bombString);
+
+        String[] arrBombs = bombString.split("¬");
+
+        if ( arrBombs.length < 3) {
+            return; // Hopeless state - not enough information }
+        }
+
+        try {
+            ROWS = Integer.parseInt(arrBombs[0]);
+            COLUMNS = Integer.parseInt(arrBombs[1]);
+        } catch (Exception e) {
+            Log.e(MainActivity.TAG, e.getMessage()) ;
+           ROWS=10;
+           COLUMNS=6;
+        }
+
+        numCells = ROWS * COLUMNS;
 
         // Prepare the game state
+        // Sets up screen
+        InitialiseBoard();
+
+        // Initial squares
+        // The player order is agreed by the consensus engine, so using a deterministic list make sense.
+        int[] initialSquares = { new Point(1,1).ThisCellNo(),
+                new Point(COLUMNS-2,ROWS-2).ThisCellNo(),
+                new Point(1,ROWS-2).ThisCellNo(),
+                new Point(COLUMNS-2,1).ThisCellNo(),
+                new Point(3,4).ThisCellNo(),
+                new Point(COLUMNS-3,ROWS-4).ThisCellNo(),
+                new Point(3,ROWS-4).ThisCellNo(),
+                new Point(COLUMNS-3,4).ThisCellNo()
+        };
+
 
 
         // Place the players. The starting positions of the players are fixed.
@@ -429,23 +439,14 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
 
-        // The bomb string is a ¬ delimited list of numbers. The first is the max number of bombs.
-        // The rest are random cells. The node starting the game generates them. Once we get max
-        // number of bombs we stop adding. If the string runs out before we reach max number, then
-        // we make do with what we have.
-
-        Log.i(MainActivity.TAG, bombString);
-
-        String[] arrBombs = bombString.split("¬");
-
-        if (arrBombs.length > 2) {  // If less than 2 params there are no bombs defined
+        if (arrBombs.length > 3) {  // If less than 2 params there are no bombs defined
             try {
-                numberOfBombs = Integer.parseInt(arrBombs[0]);
+                numberOfBombs = Integer.parseInt(arrBombs[2]);
             } catch (Exception e) {
                 Log.e(MainActivity.TAG, e.getMessage()) ;
                 numberOfBombs = 10;
             }
-            int bombIdx = 1;
+            int bombIdx = 3;
             int bombCnt = 0;
 
             do {
@@ -469,10 +470,10 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
         // Defer so all the other players are in situ
 
         // Grey out the Start image button - we have already started so should not press it again
-        ImageButton buttStart= (ImageButton) findViewById(R.id.btNew);
+//        ImageButton buttStart= (ImageButton) findViewById(R.id.btNew);
       //  buttStart.setColorFilter(Color.argb(127, 127,127,127));
-        buttStart.setImageAlpha(50);
-        buttStart.setOnClickListener(null);
+//        buttStart.setImageAlpha(50);
+//        buttStart.setOnClickListener(null);
 
         // Update screen display of our cell, so we can see our starting position.
         UpdateNeighbours(PlayerCell);
@@ -505,7 +506,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
 // Show message in the status bar at the bottom of the game screen
-    private void SetStatusMessage(String msg) {
+    public void SetStatusMessage(String msg) {
         TextView tv= (TextView) findViewById(R.id.statusText);
         tv.setText(msg);
     }
@@ -514,7 +515,16 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 // Show the number of cells claimed by each player. This player has their score first
     private void SetScoreMessage() {
+        LinearLayout tl = (LinearLayout) findViewById(R.id.topLayout);
 
+        for (int i = 0; i < tl.getChildCount(); i++) {
+            View v = tl.getChildAt(i);
+            if (v instanceof TextView) {
+                ((TextView) v).setText(Integer.toString(ThePlayers[(int)v.getTag()].squares));
+            }
+        }
+
+        /*
         String myScore = "";
         String theirScore = "";
         for (int i = 0; i < PLAYERS; i++ ) {
@@ -531,12 +541,13 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         TextView tv= (TextView) findViewById(R.id.scoreText);
         tv.setText(myScore + " " + theirScore);
+        */
     }
 
 
 
 //    Generate array of neighbouring cell numbers
-    private int[] NeighbouringCells(int cellNo) {
+    protected int[] NeighbouringCells(int cellNo) {
         return new Point(cellNo).Neighbours();
     }
 
@@ -674,7 +685,7 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
 
  // THis function receives messgaes from Babble and processes them.
-    public void ProcessMessage(Message message) {
+    private void ProcessMessage(Message message) {
 
         String msgText = message.getText();
         Log.i(MainActivity.TAG, msgText);
@@ -731,16 +742,22 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
                         }
 
 
+                        if (gameState != GameState.WAITINGTOSTART) { return ; }
+
                         ThePlayers[PLAYERS] = player;
                         PLAYERS++;
 
                         if ( player.PublicKey.equals(mMessagingService.publicKey()) ) {
                             MyPlayerIdx = PLAYERS - 1;
+
+                            displayJoinedPlayer(player.moniker, true, MyPlayerIdx);
                             SetStatusMessage("You have joined, "+player.moniker);
+
                         } else {
                             Log.i(MainActivity.TAG, player.PublicKey);
                             Log.i(MainActivity.TAG, mMessagingService.publicKey());
 
+                            displayJoinedPlayer(player.moniker, false, (PLAYERS-1));
                             SetStatusMessage(player.moniker + " has joined. We have " + Integer.toString(PLAYERS) + " players.");
                         }
                     }
@@ -759,7 +776,78 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
     }
 
 
-    public void processPendingCellMessage(int cellNo){
+    private void displayJoinedPlayer(String moniker, boolean isYou, int PlayerIdx) {
+
+        TableLayout tl = (TableLayout) findViewById(R.id.tableLayout);
+
+        TableRow tr = new TableRow(this); //TODO remove this line and suppress the resultant warning
+
+        TableLayout.LayoutParams lp = new TableLayout.LayoutParams(TableLayout.LayoutParams.FILL_PARENT, TableLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(20,10,20,10);
+        tr.setLayoutParams(lp);
+        tr.setGravity(Gravity.CENTER);
+        tr.setWeightSum(100);
+        tl.addView(tr);
+
+
+        TextView tb = new TextView(this);
+        tb.setId(View.generateViewId());
+        tb.setText(moniker);
+        if (isYou) {
+            tb.setBackgroundColor(ContextCompat.getColor(this, R.color.colorMyPlayer));
+        } else  {
+            tb.setBackgroundColor(ContextCompat.getColor(this, R.color.colorTheirPlayer));
+        }
+        tb.setPadding(20, 10 , 20, 10);
+        tb.setFocusable(false);
+        tb.setInputType(InputType.TYPE_NULL);
+        tb.setTextIsSelectable(false);
+        tb.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        tb.setTextColor(ContextCompat.getColor(this, R.color.colorPlayerText));
+
+       //  android:fontFamily="@font/custom_font"
+
+        tr.addView(tb);
+        TableRow.LayoutParams rlp = new TableRow.LayoutParams(TableLayout.LayoutParams.FILL_PARENT, TableLayout.LayoutParams.WRAP_CONTENT);
+     //   rlp.(20,10,20,10);
+        tb.setLayoutParams(rlp);
+
+
+        LinearLayout topl = (LinearLayout) findViewById(R.id.topLayout);
+
+        TextView score = new TextView(this);
+        score.setId(View.generateViewId());
+        score.setTag(PlayerIdx);
+        score.setText("1");
+        if (isYou) {
+            score.setBackgroundColor(ContextCompat.getColor(this, R.color.colorMyPlayer));
+        } else  {
+            score.setBackgroundColor(ContextCompat.getColor(this, R.color.colorTheirPlayer));
+        }
+
+
+        score.setPadding(20, 10 , 20, 10);
+        score.setFocusable(false);
+        score.setInputType(InputType.TYPE_NULL);
+        score.setTextIsSelectable(false);
+        score.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 30);
+        score.setTextColor(ContextCompat.getColor(this, R.color.colorPlayerText));
+        score.setGravity(Gravity.CENTER);
+
+        LinearLayout.LayoutParams lllp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                   LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        lllp.setMargins(20,5,20,5);
+
+
+        if (isYou) {
+            topl.addView(score, 0, lllp);
+        } else {
+            topl.addView(score, lllp);
+        }
+    }
+
+
+    private void processPendingCellMessage(int cellNo){
         if (ThePlayers[MyPlayerIdx].isDead) {return;}
         switch (TheCells[cellNo].CellState) {
             case PENDING:   //Alls Fine
@@ -940,6 +1028,113 @@ public class GameActivity extends AppCompatActivity  implements ServiceObserver 
 
         super.onDestroy();
     }
+
+
+/* ************************************************************************************************
+Helper classes
+************************************************************************************************ */
+
+
+    // Internal Class to hold cell state
+    class Cell {
+        TheCellState CellState = TheCellState.EMPTY;
+        int Owner = -1;
+        int Neighbours = 0;
+        int ID = -1;
+
+        public Cell (int id) {
+            this.ID = id;
+        }
+    }
+
+
+    // Internal class to hold player state
+    class Player {
+        String PublicKey;
+        int squares = 1;
+        String moniker;
+        boolean isDead = false;
+    }
+
+
+    // Internal class for co-ordinates
+    // Encaspsulates neighbouring cell algorithm, and conversation to and from Cartesian co-ords
+    class Point {
+        int x;
+        int y;
+
+        Point(int nx, int ny) {
+            this.x = nx;
+            this.y = ny;
+        }
+
+
+        Point(int Cellno) {
+            this.x = Cellno%COLUMNS;
+            this.y = (Cellno - this.x)/COLUMNS;
+        }
+
+        int ThisCellNo() {
+            return CellNo(this.x,this.y);
+        }
+
+        int CellNo(int ax, int ay){
+            return (ay*COLUMNS)+ax;
+        }
+
+
+        // Generates an array of Cell numbers denoting the neighbouring cells. N.B. included self.
+        int[] Neighbours() {
+            int[] rtn = new int[9];
+
+/*
+   0 1 2
+   3 4 5
+   6 7 8
+*/
+
+// Calculate all neighbours ignoring error conditions
+
+            rtn[4] = this.ThisCellNo();
+            rtn[3] = rtn[4] - 1;
+            rtn[5] = rtn[4] + 1;
+            rtn[0] = rtn[3] - COLUMNS;
+            rtn[1] = rtn[4] - COLUMNS;
+            rtn[2] = rtn[5] - COLUMNS;
+            rtn[6] = rtn[3] + COLUMNS;
+            rtn[7] = rtn[4] + COLUMNS;
+            rtn[8] = rtn[5] + COLUMNS;
+
+
+// Now wipe the edge cases
+            if (this.y<1) { // TOP ROW
+                rtn[0] = -1;
+                rtn[1] = -1;
+                rtn[2] = -1;
+            }
+
+            if (this.y>=(ROWS-1)) { // BOTTOM ROW
+                rtn[6] = -1;
+                rtn[7] = -1;
+                rtn[8] = -1;
+            }
+
+            if (this.x<1) { // LEFT COLUMN
+                rtn[0] = -1;
+                rtn[3] = -1;
+                rtn[6] = -1;
+            }
+
+            if (this.x>=(COLUMNS-1)) { // RIGHT COLUMN
+                rtn[2] = -1;
+                rtn[5] = -1;
+                rtn[8] = -1;
+            }
+            return rtn;
+        }
+    }
+
+
 
 
 }
